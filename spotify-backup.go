@@ -361,6 +361,24 @@ func fail(v ...interface{}) {
 	os.Exit(1)
 }
 
+// loadRefreshToken reads the refresh token from the local token file if present.
+func loadRefreshToken() (string, error) {
+	b, err := os.ReadFile(tokenFile)
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(b)), nil
+}
+
+// saveRefreshToken persists the refresh token to the local token file.
+func saveRefreshToken(tok string) error {
+	tok = strings.TrimSpace(tok)
+	if tok == "" {
+		return errors.New("empty refresh token")
+	}
+	return os.WriteFile(tokenFile, []byte(tok+"\n"), 0o600)
+}
+
 // doInteractiveAuth implements the authorization code flow with local server
 func doInteractiveAuth(clientID, clientSecret, redirectURI string) (accessToken, refreshToken string, err error) {
 	// Parse port from redirect URI
