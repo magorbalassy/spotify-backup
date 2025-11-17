@@ -24,6 +24,12 @@ profile.cov
 go.work
 go.work.sum
 
+# binary of spotify-backup.go
+spotify-backup
+
+# Backup folder
+backup
+
 # env file
 .env
 
