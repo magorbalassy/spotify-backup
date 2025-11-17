@@ -26,6 +26,7 @@ var (
 	envOutDir          = "OUT_DIR"
 	defaultOutDir      = "./backup"
 	defaultRedirectURI = "http://127.0.0.1:8888/callback"
+	tokenFile          = ".token"
 	userAgent          = "spotify-backup/1.0"
 	sanitizePattern    = regexp.MustCompile(`[^\w\-. ]+`)
 	httpClient         = &http.Client{Timeout: 30 * time.Second}
@@ -107,6 +108,14 @@ func main() {
 		redirectURI = defaultRedirectURI
 	}
 
+	// Try to load refresh token from file if not in env
+	if refreshToken == "" {
+		if saved, err := loadRefreshToken(); err == nil && saved != "" {
+			refreshToken = saved
+			fmt.Println("Loaded refresh token from", tokenFile)
+		}
+	}
+
 	// If no tokens but have client credentials, do interactive auth
 	if accessToken == "" && refreshToken == "" && clientID != "" && clientSecret != "" {
 		fmt.Println("No tokens found. Starting interactive OAuth flow...")
@@ -116,9 +125,13 @@ func main() {
 		}
 		accessToken = tok
 		refreshToken = refTok
-		fmt.Println("✓ Got new tokens")
-		fmt.Println("\nSave this refresh token for future runs:")
-		fmt.Printf("export SPOTIFY_REFRESH_TOKEN='%s'\n\n", refreshToken)
+
+		// Save refresh token to file
+		if err := saveRefreshToken(refreshToken); err != nil {
+			fmt.Fprintf(os.Stderr, "warning: failed to save refresh token: %v\n", err)
+		} else {
+			fmt.Println("✓ Refresh token saved to", tokenFile)
+		}
 	} else if accessToken == "" && refreshToken != "" && clientID != "" && clientSecret != "" {
 		tok, err := refreshAccessToken(clientID, clientSecret, refreshToken)
 		if err != nil {
