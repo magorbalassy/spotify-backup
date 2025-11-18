@@ -1,0 +1,13 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.app-body {
+  margin-top: 64px; /* Height of Material toolbar */
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
