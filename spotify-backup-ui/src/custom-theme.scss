@@ -6,11 +6,16 @@
 // custom components at https://material.angular.dev/guide/theming
 @use '@angular/material' as mat;
 
+// Include the common styles for Angular Material. We include this here so that you only
+// have to load a single css file for Angular Material in your app.
+@include mat.core();
+
 html {
   @include mat.theme((
     color: (
       primary: mat.$cyan-palette,
       tertiary: mat.$orange-palette,
+      theme-type: light,
     ),
     typography: Roboto,
     density: 0,

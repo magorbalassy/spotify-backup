@@ -5,6 +5,8 @@
   right: 0;
   z-index: 1000;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  background-color: var(--mat-sys-primary) !important;
+  color: var(--mat-sys-on-primary) !important;
 }
 
 .toolbar-title {
@@ -13,6 +15,15 @@
   gap: 8px;
   font-size: 20px;
   font-weight: 500;
+  color: var(--mat-sys-on-primary);
+}
+
+.toolbar-title mat-icon {
+  color: var(--mat-sys-on-primary);
+}
+
+.toolbar button {
+  color: var(--mat-sys-on-primary);
 }
 
 .toolbar-spacer {
