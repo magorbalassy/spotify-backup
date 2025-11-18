@@ -30,6 +30,9 @@ spotify-backup
 # Backup folder
 backup
 
+# node_modules folder
+node_modules/
+
 # env file
 .env
 
