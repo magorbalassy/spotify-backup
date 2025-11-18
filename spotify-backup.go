@@ -15,6 +15,9 @@ import (
 	"runtime"
 	"strings"
 	"time"
+
+	"github.com/gin-contrib/cors"
+	"github.com/gin-gonic/gin"
 )
 
 var (
@@ -31,6 +34,22 @@ var (
 	sanitizePattern    = regexp.MustCompile(`[^\w\-. ]+`)
 	httpClient         = &http.Client{Timeout: 30 * time.Second}
 )
+
+// Global state for web server mode
+var (
+	appState = &AppState{
+		clientID:     os.Getenv(envClientID),
+		clientSecret: os.Getenv(envClientSecret),
+	}
+)
+
+type AppState struct {
+	accessToken  string
+	refreshToken string
+	clientID     string
+	clientSecret string
+	redirectURI  string
+}
 
 type playlistPage struct {
 	Items []playlistItem `json:"items"`
@@ -91,6 +110,18 @@ type savedPlaylist struct {
 }
 
 func main() {
+	// Check if web server mode is enabled
+	webMode := os.Getenv("WEB_MODE")
+	if webMode == "true" || webMode == "1" {
+		startWebServer()
+		return
+	}
+
+	// Original CLI mode
+	runCLIMode()
+}
+
+func runCLIMode() {
 	outDir := os.Getenv(envOutDir)
 	if outDir == "" {
 		outDir = defaultOutDir
@@ -501,4 +532,212 @@ func openBrowser(url string) error {
 	}
 	args = append(args, url)
 	return exec.Command(cmd, args...).Start()
+}
+
+// Web server functionality
+
+func startWebServer() {
+	// Load any existing tokens
+	if rt, err := loadRefreshToken(); err == nil && rt != "" {
+		appState.refreshToken = rt
+		fmt.Println("Loaded refresh token from", tokenFile)
+	}
+
+	redirectURI := os.Getenv(envRedirectURI)
+	if redirectURI == "" {
+		redirectURI = defaultRedirectURI
+	}
+	appState.redirectURI = redirectURI
+
+	gin.SetMode(gin.ReleaseMode)
+	r := gin.Default()
+
+	// CORS middleware for Angular frontend
+	r.Use(cors.New(cors.Config{
+		AllowOrigins:     []string{"http://localhost:4200", "http://localhost:3000"},
+		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization"},
+		ExposeHeaders:    []string{"Content-Length"},
+		AllowCredentials: true,
+		MaxAge:           12 * time.Hour,
+	}))
+
+	// API routes
+	api := r.Group("/api")
+	{
+		api.GET("/status", handleStatus)
+		api.POST("/auth/setup", handleAuthSetup)
+		api.POST("/auth/start", handleAuthStart)
+		api.GET("/auth/callback", handleAuthCallback)
+	}
+
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+
+	fmt.Printf("Starting web server on port %s...\n", port)
+	if err := r.Run(":" + port); err != nil {
+		fail("failed to start web server:", err)
+	}
+}
+
+// API Response types
+type StatusResponse struct {
+	HasToken    bool   `json:"hasToken"`
+	HasClientID bool   `json:"hasClientId"`
+	NeedsSetup  bool   `json:"needsSetup"`
+	Message     string `json:"message"`
+}
+
+type AuthSetupRequest struct {
+	ClientID     string `json:"clientId" binding:"required"`
+	ClientSecret string `json:"clientSecret" binding:"required"`
+}
+
+type AuthSetupResponse struct {
+	Success bool   `json:"success"`
+	Message string `json:"message"`
+	AuthURL string `json:"authUrl,omitempty"`
+}
+
+type ErrorResponse struct {
+	Error string `json:"error"`
+}
+
+// handleStatus checks if there's a valid token or if setup is needed
+func handleStatus(c *gin.Context) {
+	hasToken := appState.accessToken != "" || appState.refreshToken != ""
+	hasClientID := appState.clientID != ""
+
+	resp := StatusResponse{
+		HasToken:    hasToken,
+		HasClientID: hasClientID,
+		NeedsSetup:  !hasClientID,
+	}
+
+	if !hasClientID {
+		resp.Message = "Please provide Spotify client ID and secret to begin"
+	} else if !hasToken {
+		resp.Message = "Client credentials configured. Ready to authenticate with Spotify"
+	} else {
+		resp.Message = "Authentication complete. Ready to backup playlists"
+	}
+
+	c.JSON(http.StatusOK, resp)
+}
+
+// handleAuthSetup receives client ID and secret from UI and initiates auth flow
+func handleAuthSetup(c *gin.Context) {
+	var req AuthSetupRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, ErrorResponse{Error: "Invalid request: " + err.Error()})
+		return
+	}
+
+	// Store credentials
+	appState.clientID = req.ClientID
+	appState.clientSecret = req.ClientSecret
+
+	// Generate auth URL
+	scopes := "playlist-read-private playlist-read-collaborative user-library-read"
+	authURL := fmt.Sprintf(
+		"https://accounts.spotify.com/authorize?client_id=%s&response_type=code&redirect_uri=%s&scope=%s",
+		url.QueryEscape(req.ClientID),
+		url.QueryEscape(appState.redirectURI),
+		url.QueryEscape(scopes),
+	)
+
+	c.JSON(http.StatusOK, AuthSetupResponse{
+		Success: true,
+		Message: "Client credentials saved. Please authorize the application",
+		AuthURL: authURL,
+	})
+}
+
+// handleAuthStart initiates the OAuth flow
+func handleAuthStart(c *gin.Context) {
+	if appState.clientID == "" || appState.clientSecret == "" {
+		c.JSON(http.StatusBadRequest, ErrorResponse{Error: "Client credentials not configured"})
+		return
+	}
+
+	scopes := "playlist-read-private playlist-read-collaborative user-library-read"
+	authURL := fmt.Sprintf(
+		"https://accounts.spotify.com/authorize?client_id=%s&response_type=code&redirect_uri=%s&scope=%s",
+		url.QueryEscape(appState.clientID),
+		url.QueryEscape(appState.redirectURI),
+		url.QueryEscape(scopes),
+	)
+
+	c.JSON(http.StatusOK, gin.H{
+		"authUrl": authURL,
+		"message": "Please visit the auth URL to authorize the application",
+	})
+}
+
+// handleAuthCallback receives the OAuth callback with authorization code
+func handleAuthCallback(c *gin.Context) {
+	code := c.Query("code")
+	if code == "" {
+		c.HTML(http.StatusBadRequest, "", gin.H{})
+		c.Writer.WriteString("<html><body><h1>Error: No authorization code received</h1></body></html>")
+		return
+	}
+
+	// Exchange code for tokens
+	form := url.Values{}
+	form.Set("grant_type", "authorization_code")
+	form.Set("code", code)
+	form.Set("redirect_uri", appState.redirectURI)
+
+	req, _ := http.NewRequest("POST", "https://accounts.spotify.com/api/token", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.SetBasicAuth(appState.clientID, appState.clientSecret)
+	req.Header.Set("User-Agent", userAgent)
+
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		c.Writer.WriteString(fmt.Sprintf("<html><body><h1>Error</h1><p>Failed to exchange authorization code: %s</p></body></html>", err.Error()))
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		b, _ := io.ReadAll(resp.Body)
+		c.Writer.WriteString(fmt.Sprintf("<html><body><h1>Error</h1><p>Token exchange failed: %s - %s</p></body></html>", resp.Status, string(b)))
+		return
+	}
+
+	var out struct {
+		AccessToken  string `json:"access_token"`
+		RefreshToken string `json:"refresh_token"`
+		ExpiresIn    int    `json:"expires_in"`
+		TokenType    string `json:"token_type"`
+		Scope        string `json:"scope"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		c.Writer.WriteString(fmt.Sprintf("<html><body><h1>Error</h1><p>Failed to decode token response: %s</p></body></html>", err.Error()))
+		return
+	}
+
+	if out.AccessToken == "" || out.RefreshToken == "" {
+		c.Writer.WriteString("<html><body><h1>Error</h1><p>No tokens received from Spotify</p></body></html>")
+		return
+	}
+
+	// Store tokens
+	appState.accessToken = out.AccessToken
+	appState.refreshToken = out.RefreshToken
+
+	// Save refresh token to file
+	if err := saveRefreshToken(out.RefreshToken); err != nil {
+		fmt.Fprintf(os.Stderr, "warning: failed to save refresh token: %v\n", err)
+	} else {
+		fmt.Println("✓ Refresh token saved to", tokenFile)
+	}
+
+	// Return success page
+	c.Header("Content-Type", "text/html")
+	c.Writer.WriteString("<html><body><h1>✓ Authorization successful!</h1><p>You can close this window and return to the application.</p></body></html>")
 }
