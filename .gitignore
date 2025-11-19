@@ -33,6 +33,9 @@ backup
 # node_modules folder
 node_modules/
 
+# web folder
+public/
+
 # env file
 .env
 

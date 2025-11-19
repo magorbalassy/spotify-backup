@@ -58,21 +58,27 @@ RUN go mod download
 COPY *.go ./
 
 # Build the Go binary
-RUN CGO_ENABLED=0 GOOS=linux go build -o spotify-backup .
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o spotify-backup .
 
 # Stage 3: Final runtime image
-FROM alpine:latest
+FROM alpine:3.20
 
 WORKDIR /app
 
-# Install ca-certificates for HTTPS requests
-RUN apk --no-cache add ca-certificates
+# Install ca-certificates for HTTPS requests and create non-root user
+RUN apk --no-cache add ca-certificates tzdata && \
+    adduser -D -u 10001 app
 
 # Copy the Go binary from builder
 COPY --from=backend-builder /app/spotify-backup .
 
 # Copy the compiled Angular app from frontend builder
 COPY --from=frontend-builder /app/frontend/dist/spotify-backup-ui/browser ./public
+
+# Change ownership to app user
+RUN chown -R app:app /app
+
+USER app
 
 # Expose port
 EXPOSE 8080
