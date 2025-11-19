@@ -3,6 +3,8 @@
 # --- Build stage ---
 FROM golang:1.25-alpine AS build
 WORKDIR /src
+COPY go.mod go.sum ./
+RUN go mod download
 COPY spotify-backup.go ./
 # Build without BuildKit cache mounts for compatibility with legacy builder
 ENV CGO_ENABLED=0 GOOS=linux

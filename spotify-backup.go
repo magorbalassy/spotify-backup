@@ -6,10 +6,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"mime"
 	"net/http"
 	"net/url"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"regexp"
 	"runtime"
@@ -537,6 +539,11 @@ func openBrowser(url string) error {
 // Web server functionality
 
 func startWebServer() {
+	mime.AddExtensionType(".js", "text/javascript")
+	mime.AddExtensionType(".mjs", "text/javascript")
+	mime.AddExtensionType(".css", "text/css")
+	mime.AddExtensionType(".wasm", "application/wasm")
+
 	// Load any existing tokens
 	if rt, err := loadRefreshToken(); err == nil && rt != "" {
 		appState.refreshToken = rt
@@ -583,18 +590,33 @@ func setupWebServer() *gin.Engine {
 		api.POST("/auth/start", handleAuthStart)
 	}
 
-	// Serve static files from public directory (Angular build output)
-	r.Static("/assets", "./public/assets")
+	// Serve favicon if present
 	r.StaticFile("/favicon.ico", "./public/favicon.ico")
 
-	// Serve index.html for all non-API routes (Angular routing)
+	// SPA static + fallback: serve real files from ./public, otherwise index.html
 	r.NoRoute(func(c *gin.Context) {
-		// Don't serve index.html for API routes
-		if !strings.HasPrefix(c.Request.URL.Path, "/api") {
-			c.File("./public/index.html")
-		} else {
-			c.JSON(404, gin.H{"error": "Not found"})
+		p := c.Request.URL.Path
+
+		// Never hijack API
+		if strings.HasPrefix(p, "/api") {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Not found"})
+			return
 		}
+
+		clean := path.Clean(p)
+		if clean == "/" {
+			c.File("./public/index.html")
+			return
+		}
+
+		local := filepath.Join("public", strings.TrimPrefix(clean, "/"))
+		if info, err := os.Stat(local); err == nil && !info.IsDir() {
+			c.File(local)
+			return
+		}
+
+		// Fallback to SPA entry
+		c.File("./public/index.html")
 	})
 
 	return r
