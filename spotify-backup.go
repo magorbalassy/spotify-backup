@@ -573,7 +573,6 @@ func startWebServer() {
 func setupWebServer() *gin.Engine {
 	r := gin.Default()
 
-	// Configure CORS
 	r.Use(cors.New(cors.Config{
 		AllowOrigins:     []string{"http://localhost:4200", "http://localhost:8080"},
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
@@ -581,7 +580,6 @@ func setupWebServer() *gin.Engine {
 		AllowCredentials: true,
 	}))
 
-	// API routes
 	api := r.Group("/api")
 	{
 		api.GET("/status", handleStatus)
@@ -590,32 +588,36 @@ func setupWebServer() *gin.Engine {
 		api.POST("/auth/start", handleAuthStart)
 	}
 
-	// Serve favicon if present
+	// Favicon (optional)
 	r.StaticFile("/favicon.ico", "./public/favicon.ico")
 
-	// SPA static + fallback: serve real files from ./public, otherwise index.html
-	r.NoRoute(func(c *gin.Context) {
-		p := c.Request.URL.Path
+	// Serve any static file directly
+	r.Static("/public", "./public") // optional helper if you want /public/* access
 
-		// Never hijack API
-		if strings.HasPrefix(p, "/api") {
+	// Explicit root route (so you don't depend on NoRoute)
+	r.GET("/", func(c *gin.Context) {
+		c.File("./public/index.html")
+	})
+
+	// Optional: serve /index.html explicitly
+	r.GET("/index.html", func(c *gin.Context) {
+		c.File("./public/index.html")
+	})
+
+	// SPA fallback (only if file truly missing)
+	r.NoRoute(func(c *gin.Context) {
+		if strings.HasPrefix(c.Request.URL.Path, "/api") {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Not found"})
 			return
 		}
-
-		clean := path.Clean(p)
-		if clean == "/" {
-			c.File("./public/index.html")
-			return
+		requested := strings.TrimPrefix(path.Clean(c.Request.URL.Path), "/")
+		if requested != "" {
+			candidate := filepath.Join("public", requested)
+			if info, err := os.Stat(candidate); err == nil && !info.IsDir() {
+				c.File(candidate)
+				return
+			}
 		}
-
-		local := filepath.Join("public", strings.TrimPrefix(clean, "/"))
-		if info, err := os.Stat(local); err == nil && !info.IsDir() {
-			c.File(local)
-			return
-		}
-
-		// Fallback to SPA entry
 		c.File("./public/index.html")
 	})
 
