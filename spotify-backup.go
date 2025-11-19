@@ -588,36 +588,34 @@ func setupWebServer() *gin.Engine {
 		api.POST("/auth/start", handleAuthStart)
 	}
 
-	// Favicon (optional)
-	r.StaticFile("/favicon.ico", "./public/favicon.ico")
+	// Static root: serve every file under public at top-level
+	// This lets /main.<hash>.js resolve automatically.
+	r.Static("/", "./public")
 
-	// Serve any static file directly
-	r.Static("/public", "./public") // optional helper if you want /public/* access
-
-	// Explicit root route (so you don't depend on NoRoute)
+	// Optional explicit root route (can help clarity)
 	r.GET("/", func(c *gin.Context) {
 		c.File("./public/index.html")
 	})
 
-	// Optional: serve /index.html explicitly
-	r.GET("/index.html", func(c *gin.Context) {
-		c.File("./public/index.html")
-	})
-
-	// SPA fallback (only if file truly missing)
 	r.NoRoute(func(c *gin.Context) {
-		if strings.HasPrefix(c.Request.URL.Path, "/api") {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Not found"})
+		p := c.Request.URL.Path
+		// Keep API 404 separate
+		if strings.HasPrefix(p, "/api") {
+			c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
 			return
 		}
-		requested := strings.TrimPrefix(path.Clean(c.Request.URL.Path), "/")
-		if requested != "" {
-			candidate := filepath.Join("public", requested)
-			if info, err := os.Stat(candidate); err == nil && !info.IsDir() {
-				c.File(candidate)
+
+		ext := filepath.Ext(p)
+		// If it looks like a static asset (.js/.css/.json/.wasm) and missing → 404 instead of index.html
+		if ext != "" && (ext == ".js" || ext == ".mjs" || ext == ".css" || ext == ".json" || ext == ".wasm" || ext == ".map") {
+			local := filepath.Join("public", strings.TrimPrefix(path.Clean(p), "/"))
+			if _, err := os.Stat(local); err != nil {
+				c.JSON(http.StatusNotFound, gin.H{"error": "asset not found"})
 				return
 			}
 		}
+
+		// Otherwise serve SPA entry
 		c.File("./public/index.html")
 	})
 
