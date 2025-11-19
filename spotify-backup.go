@@ -588,34 +588,33 @@ func setupWebServer() *gin.Engine {
 		api.POST("/auth/start", handleAuthStart)
 	}
 
-	// Static root: serve every file under public at top-level
-	// This lets /main.<hash>.js resolve automatically.
-	r.Static("/", "./public")
+	// Serve favicon (if present)
+	r.StaticFile("/favicon.ico", "./public/favicon.ico")
 
-	// Optional explicit root route (can help clarity)
+	// Explicit root route to serve the SPA entry
 	r.GET("/", func(c *gin.Context) {
 		c.File("./public/index.html")
 	})
 
 	r.NoRoute(func(c *gin.Context) {
 		p := c.Request.URL.Path
-		// Keep API 404 separate
 		if strings.HasPrefix(p, "/api") {
 			c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
 			return
 		}
 
-		ext := filepath.Ext(p)
-		// If it looks like a static asset (.js/.css/.json/.wasm) and missing → 404 instead of index.html
-		if ext != "" && (ext == ".js" || ext == ".mjs" || ext == ".css" || ext == ".json" || ext == ".wasm" || ext == ".map") {
-			local := filepath.Join("public", strings.TrimPrefix(path.Clean(p), "/"))
-			if _, err := os.Stat(local); err != nil {
-				c.JSON(http.StatusNotFound, gin.H{"error": "asset not found"})
-				return
-			}
+		clean := path.Clean(p)
+		if clean == "/" {
+			c.File("./public/index.html")
+			return
 		}
 
-		// Otherwise serve SPA entry
+		local := filepath.Join("public", strings.TrimPrefix(clean, "/"))
+		if info, err := os.Stat(local); err == nil && !info.IsDir() {
+			c.File(local)
+			return
+		}
+
 		c.File("./public/index.html")
 	})
 
