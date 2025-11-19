@@ -550,26 +550,7 @@ func startWebServer() {
 	appState.redirectURI = redirectURI
 
 	gin.SetMode(gin.ReleaseMode)
-	r := gin.Default()
-
-	// CORS middleware for Angular frontend
-	r.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"http://localhost:4200", "http://localhost:3000"},
-		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization"},
-		ExposeHeaders:    []string{"Content-Length"},
-		AllowCredentials: true,
-		MaxAge:           12 * time.Hour,
-	}))
-
-	// API routes
-	api := r.Group("/api")
-	{
-		api.GET("/status", handleStatus)
-		api.POST("/auth/setup", handleAuthSetup)
-		api.POST("/auth/start", handleAuthStart)
-		api.GET("/auth/callback", handleAuthCallback)
-	}
+	r := setupWebServer()
 
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -580,6 +561,43 @@ func startWebServer() {
 	if err := r.Run(":" + port); err != nil {
 		fail("failed to start web server:", err)
 	}
+}
+
+func setupWebServer() *gin.Engine {
+	r := gin.Default()
+
+	// Configure CORS
+	r.Use(cors.New(cors.Config{
+		AllowOrigins:     []string{"http://localhost:4200", "http://localhost:8080"},
+		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Accept"},
+		AllowCredentials: true,
+	}))
+
+	// API routes
+	api := r.Group("/api")
+	{
+		api.GET("/status", handleStatus)
+		api.POST("/auth/setup", handleAuthSetup)
+		api.GET("/auth/callback", handleAuthCallback)
+		api.POST("/auth/start", handleAuthStart)
+	}
+
+	// Serve static files from public directory (Angular build output)
+	r.Static("/assets", "./public/assets")
+	r.StaticFile("/favicon.ico", "./public/favicon.ico")
+
+	// Serve index.html for all non-API routes (Angular routing)
+	r.NoRoute(func(c *gin.Context) {
+		// Don't serve index.html for API routes
+		if !strings.HasPrefix(c.Request.URL.Path, "/api") {
+			c.File("./public/index.html")
+		} else {
+			c.JSON(404, gin.H{"error": "Not found"})
+		}
+	})
+
+	return r
 }
 
 // API Response types
