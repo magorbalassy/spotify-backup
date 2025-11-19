@@ -4,44 +4,93 @@
     <p class="subtitle">Backup and manage your Spotify playlists with ease</p>
   </div>
 
-  <div class="cards-container">
-    <mat-card appearance="outlined" class="feature-card">
+  @if (loading()) {
+    <div class="loading-container">
+      <mat-spinner></mat-spinner>
+      <p>Checking backend status...</p>
+    </div>
+  }
+
+  @if (error()) {
+    <mat-card appearance="outlined" class="error-card">
+      <mat-card-content>
+        <div class="error-message">
+          <mat-icon color="warn">error</mat-icon>
+          <p>{{ error() }}</p>
+        </div>
+        <button mat-raised-button color="primary" (click)="checkStatus()">
+          Retry
+        </button>
+      </mat-card-content>
+    </mat-card>
+  }
+
+  @if (status() && !loading() && !error()) {
+    <mat-card appearance="outlined" class="status-card">
       <mat-card-header>
-        <mat-icon mat-card-avatar>backup</mat-icon>
-        <mat-card-title>Automatic Backup</mat-card-title>
+        <mat-icon mat-card-avatar>info</mat-icon>
+        <mat-card-title>Backend Status</mat-card-title>
       </mat-card-header>
       <mat-card-content>
-        <p>Automatically backup all your playlists and save them as JSON files for safekeeping.</p>
+        <p>{{ status()!.message }}</p>
+        <div class="status-indicators">
+          <div class="status-item">
+            <mat-icon [color]="status()!.hasClientId ? 'primary' : 'warn'">
+              {{ status()!.hasClientId ? 'check_circle' : 'cancel' }}
+            </mat-icon>
+            <span>Client Credentials {{ status()!.hasClientId ? 'Configured' : 'Not Configured' }}</span>
+          </div>
+          <div class="status-item">
+            <mat-icon [color]="status()!.hasToken ? 'primary' : 'warn'">
+              {{ status()!.hasToken ? 'check_circle' : 'cancel' }}
+            </mat-icon>
+            <span>Authentication {{ status()!.hasToken ? 'Complete' : 'Required' }}</span>
+          </div>
+        </div>
       </mat-card-content>
-      <mat-card-actions>
-        <button mat-raised-button color="primary">Start Backup</button>
-      </mat-card-actions>
     </mat-card>
 
-    <mat-card appearance="outlined" class="feature-card">
-      <mat-card-header>
-        <mat-icon mat-card-avatar>playlist_play</mat-icon>
-        <mat-card-title>View Playlists</mat-card-title>
-      </mat-card-header>
-      <mat-card-content>
-        <p>Browse and manage your backed up playlists. View track details and metadata.</p>
-      </mat-card-content>
-      <mat-card-actions>
-        <button mat-raised-button color="accent">View All</button>
-      </mat-card-actions>
-    </mat-card>
+    <div class="cards-container">
+      <mat-card appearance="outlined" class="feature-card">
+        <mat-card-header>
+          <mat-icon mat-card-avatar>backup</mat-icon>
+          <mat-card-title>Automatic Backup</mat-card-title>
+        </mat-card-header>
+        <mat-card-content>
+          <p>Automatically backup all your playlists and save them as JSON files for safekeeping.</p>
+        </mat-card-content>
+        <mat-card-actions>
+          <button mat-raised-button color="primary" [disabled]="!status()!.hasToken">
+            Start Backup
+          </button>
+        </mat-card-actions>
+      </mat-card>
 
-    <mat-card appearance="outlined" class="feature-card">
-      <mat-card-header>
-        <mat-icon mat-card-avatar>settings</mat-icon>
-        <mat-card-title>Configuration</mat-card-title>
-      </mat-card-header>
-      <mat-card-content>
-        <p>Configure your Spotify API credentials and customize backup settings.</p>
-      </mat-card-content>
-      <mat-card-actions>
-        <button mat-raised-button>Configure</button>
-      </mat-card-actions>
-    </mat-card>
-  </div>
+      <mat-card appearance="outlined" class="feature-card">
+        <mat-card-header>
+          <mat-icon mat-card-avatar>playlist_play</mat-icon>
+          <mat-card-title>View Playlists</mat-card-title>
+        </mat-card-header>
+        <mat-card-content>
+          <p>Browse and manage your backed up playlists. View track details and metadata.</p>
+        </mat-card-content>
+        <mat-card-actions>
+          <button mat-raised-button color="accent">View All</button>
+        </mat-card-actions>
+      </mat-card>
+
+      <mat-card appearance="outlined" class="feature-card">
+        <mat-card-header>
+          <mat-icon mat-card-avatar>settings</mat-icon>
+          <mat-card-title>Configuration</mat-card-title>
+        </mat-card-header>
+        <mat-card-content>
+          <p>Configure your Spotify API credentials and customize backup settings.</p>
+        </mat-card-content>
+        <mat-card-actions>
+          <button mat-raised-button>Configure</button>
+        </mat-card-actions>
+      </mat-card>
+    </div>
+  }
 </div>
