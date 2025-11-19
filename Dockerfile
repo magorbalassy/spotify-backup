@@ -44,7 +44,7 @@ COPY spotify-backup-ui/ ./
 RUN npm run build
 
 # Stage 2: Build Go backend
-FROM golang:1.23-alpine AS backend-builder
+FROM golang:1.25-alpine AS backend-builder
 
 WORKDIR /app
 
