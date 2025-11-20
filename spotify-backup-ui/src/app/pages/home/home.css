@@ -102,6 +102,7 @@
 
 .status-card {
   margin: 0 20px 32px;
+  margin-top: 3rem;
 }
 
 .status-card mat-icon[mat-card-avatar] {
