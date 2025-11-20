@@ -26,29 +26,6 @@
   }
 
   @if (status() && !loading() && !error()) {
-    <mat-card appearance="outlined" class="status-card">
-      <mat-card-header>
-        <mat-icon mat-card-avatar>info</mat-icon>
-        <mat-card-title>Backend Status</mat-card-title>
-      </mat-card-header>
-      <mat-card-content>
-        <p>{{ status()!.message }}</p>
-        <div class="status-indicators">
-          <div class="status-item">
-            <mat-icon [color]="status()!.hasClientId ? 'primary' : 'warn'">
-              {{ status()!.hasClientId ? 'check_circle' : 'cancel' }}
-            </mat-icon>
-            <span>Client Credentials {{ status()!.hasClientId ? 'Configured' : 'Not Configured' }}</span>
-          </div>
-          <div class="status-item">
-            <mat-icon [color]="status()!.hasToken ? 'primary' : 'warn'">
-              {{ status()!.hasToken ? 'check_circle' : 'cancel' }}
-            </mat-icon>
-            <span>Authentication {{ status()!.hasToken ? 'Complete' : 'Required' }}</span>
-          </div>
-        </div>
-      </mat-card-content>
-    </mat-card>
 
     <div class="cards-container">
       <mat-card appearance="outlined" class="feature-card">
@@ -92,5 +69,29 @@
         </mat-card-actions>
       </mat-card>
     </div>
+
+    <mat-card appearance="outlined" class="status-card">
+      <mat-card-header>
+        <mat-icon mat-card-avatar>info</mat-icon>
+        <mat-card-title>Backend Status</mat-card-title>
+      </mat-card-header>
+      <mat-card-content>
+        <p>{{ status()!.message }}</p>
+        <div class="status-indicators">
+          <div class="status-item">
+            <mat-icon [color]="status()!.hasClientId ? 'primary' : 'warn'">
+              {{ status()!.hasClientId ? 'check_circle' : 'cancel' }}
+            </mat-icon>
+            <span>Client Credentials {{ status()!.hasClientId ? 'Configured' : 'Not Configured' }}</span>
+          </div>
+          <div class="status-item">
+            <mat-icon [color]="status()!.hasToken ? 'primary' : 'warn'">
+              {{ status()!.hasToken ? 'check_circle' : 'cancel' }}
+            </mat-icon>
+            <span>Authentication {{ status()!.hasToken ? 'Complete' : 'Required' }}</span>
+          </div>
+        </div>
+      </mat-card-content>
+    </mat-card>
   }
 </div>
