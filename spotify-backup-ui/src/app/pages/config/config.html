@@ -1,0 +1,98 @@
+<div class="config-container">
+  <div class="config-header">
+    <h1>Configuration</h1>
+    <p class="subtitle">Configure your Spotify API credentials</p>
+  </div>
+
+  <mat-card appearance="outlined" class="config-card">
+    <mat-card-header>
+      <mat-icon mat-card-avatar>settings</mat-icon>
+      <mat-card-title>Spotify API Credentials</mat-card-title>
+      <mat-card-subtitle>Enter your Spotify Developer credentials to enable backup functionality</mat-card-subtitle>
+    </mat-card-header>
+
+    <mat-card-content>
+      <div class="form-container">
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Client ID</mat-label>
+          <input 
+            matInput 
+            type="text" 
+            [(ngModel)]="clientId"
+            placeholder="Enter your Spotify Client ID"
+            [disabled]="saving()">
+          <mat-icon matPrefix>key</mat-icon>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Client Secret</mat-label>
+          <input 
+            matInput 
+            type="password" 
+            [(ngModel)]="clientSecret"
+            placeholder="Enter your Spotify Client Secret"
+            [disabled]="saving()">
+          <mat-icon matPrefix>lock</mat-icon>
+        </mat-form-field>
+
+        @if (error()) {
+          <div class="error-message">
+            <mat-icon color="warn">error</mat-icon>
+            <span>{{ error() }}</span>
+          </div>
+        }
+
+        @if (success()) {
+          <div class="success-message">
+            <mat-icon color="primary">check_circle</mat-icon>
+            <span>Credentials saved successfully!</span>
+          </div>
+        }
+      </div>
+    </mat-card-content>
+
+    <mat-card-actions>
+      @if (saving()) {
+        <button 
+          mat-raised-button 
+          color="primary" 
+          [disabled]="true">
+          <mat-spinner diameter="20"></mat-spinner>
+          Saving...
+        </button>
+      } @else {
+        <button 
+          mat-raised-button 
+          color="primary" 
+          (click)="saveCredentials()">
+          <mat-icon>save</mat-icon>
+          Save Credentials
+        </button>
+      }
+      <button 
+        mat-button 
+        (click)="clearForm()"
+        [disabled]="saving()">
+        <mat-icon>clear</mat-icon>
+        Clear
+      </button>
+    </mat-card-actions>
+  </mat-card>
+
+  <mat-card appearance="outlined" class="info-card">
+    <mat-card-header>
+      <mat-icon mat-card-avatar>info</mat-icon>
+      <mat-card-title>How to get your credentials</mat-card-title>
+    </mat-card-header>
+    <mat-card-content>
+      <ol class="steps-list">
+        <li>Go to <a href="https://developer.spotify.com/dashboard" target="_blank" rel="noopener">Spotify Developer Dashboard</a></li>
+        <li>Log in with your Spotify account</li>
+        <li>Click "Create an App"</li>
+        <li>Fill in the app name and description</li>
+        <li>Copy your <strong>Client ID</strong> and <strong>Client Secret</strong></li>
+        <li>Paste them into the form above</li>
+      </ol>
+    </mat-card-content>
+  </mat-card>
+</div>
